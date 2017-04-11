@@ -27,17 +27,20 @@ def index(n, iterable):
     """
     :result: nth item
     """
-    for i,x in enumerate(iterable):
-        if i==n: return x
+    try:
+        return iterable[n]
+    except TypeError:
+        pass
+    for i,x in enumerate(tee(iterable)[1]):
+        if i==n:
+            return x
     raise IndexError
 
 def first(iterable):
     """
     :result: first element in the iterable
     """
-    for x in iterable:
-        return x # works in all cases by definition of iterable
-    raise IndexError
+    return index(0,iterable)
 
 
 def last(iterable):
@@ -68,7 +71,7 @@ def ilen(it):
     try:
         return len(it) #much faster if defined...
     except:
-        return sum(1 for _ in it)
+        return sum(1 for _ in tee(it)[1])
 
 def irange(start_or_end, optional_end=None):
     """
@@ -194,29 +197,20 @@ def compress(iterable):
     if count:
         yield prev,count
 
-def tee(iterable, n=2, copy=None):
+def tee(iterable,n=2):
     """tee or copy depending on type and goal
 
     :param iterable: any iterable
-    :param n: int number of tees/copies to return
-    :param copy: optional copy function, for exemple copy.copy or copy.deepcopy
-    :result: tee of iterable if it's an iterator or generator, or (deep)copies for other types
-
-    this function is useful to avoid side effects at a lower memory cost
-    depending on the case
+    :result: independent tee of iterable
     """
     if isinstance(iterable,(list,tuple,set,dict)):
-        if copy is None: # same object replicated n times
-            res=[iterable]*n
-        else:
-            res=[copy(iterable) for _ in range(n)]
-        return tuple(res)
-    return itertools.tee(iterable,n) # make independent iterators
+        iterable=itertools.chain(iterable) #transform in iterator
+    return itertools.tee(iterable,n)
 
 def groups(iterable, n, step=None):
     """Make groups of 'n' elements from the iterable advancing
     'step' elements on each iteration"""
-    itlist = tee(iterable, n=n, copy=None)
+    itlist = tee(iterable, n=n)
     onestepit = six.moves.zip(*(itertools.starmap(drop, enumerate(itlist))))
     return every(step or n, onestepit)
 
@@ -230,8 +224,11 @@ def pairwise(iterable,op=None,loop=False):
     :result: pairs iterator (s1,s2), (s2,s3) ... (si,si+1), ... (sn-1,sn) + optional pair to close the loop
     """
 
-    i=itertools.chain(iterable,[first(iterable)]) if loop else iterable
-    for x in groups(i,2,1):
+    if loop:
+        it=itertools.chain(iterable,[first(iterable)])  
+    else:
+        it=iterable
+    for x in groups(it,2,1):
         if op:
             yield op(x[1],x[0]) #reversed ! (for sub or div)
         else:
@@ -251,7 +248,7 @@ def shape(iterable):
         while True:
             res.append(ilen(iterable))
             iterable=first(iterable)
-    except TypeError:
+    except (IndexError, TypeError):
         pass
     return res
 

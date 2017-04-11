@@ -7,6 +7,11 @@ from Goulib.tests import *
 
 from Goulib.itertools2 import *
 
+def gen10(): #generator to test clean tee ing
+    for i in range(10):
+        yield i
+    
+
 class TestTake:
     def test_take(self):
         assert_equal(take(3, irange(1,10)),[1,2,3])
@@ -36,6 +41,8 @@ class TestDrop:
 
 class TestIlen:
     def test_ilen(self):
+        assert_equal(ilen(gen10()),10)
+        assert_equal(ilen(gen10()),10)
         assert_equal(ilen(irange(10,0)),0)
         assert_equal(ilen(irange(11,20)),10)
 
@@ -390,6 +397,7 @@ class TestShape:
     def test_shape(self):
         data=[[[5,6,7],2,[3,4]],1] #data can have any shape...
         assert_equal(shape(data),(2,3,3)) #... but shape is evaluated from [0]
+        assert_equal(shape(gen10()),[10])
 
 class TestNdim:
     def test_ndim(self):
