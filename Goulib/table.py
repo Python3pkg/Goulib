@@ -426,10 +426,12 @@ class Table(pandas.DataFrame):
         """
         def json_serial(obj):
             """JSON serializer for objects not serializable by default json code"""
-            if isinstance(obj, (datetime,date,time)):
+            if hasattr(obj, 'isoformat'):
                 return obj.isoformat()
-            if isinstance(obj, (timedelta)):
+            try:
                 return str(obj)
+            except Exception:
+                pass
             raise TypeError ("Type %s not serializable"%(type(obj)))
         array=[self.rowasdict(i) for i in range(len(self))]
         kwargs.setdefault('default',json_serial)

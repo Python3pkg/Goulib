@@ -146,22 +146,15 @@ class TestVeccompare:
 
 class TestFibonacci:
     def test_fibonacci(self):
-        
+        f=[fibonacci(i) for i in range(10)]
+        assert_equal(f,[0,1,1,2,3,5,8,13,21,34])
+        assert_equal(f,itertools2.take(10,fibonacci_gen()))
+
         #http://controlfd.com/2016/07/05/using-floats-in-python.html
         assert_equal(fibonacci(78),8944394323791464)
         
-        # https://projecteuler.net/problem=2
-        from itertools import takewhile
-
-        def problem2(n):
-            """Find the sum of all the even-valued terms in the Fibonacci < 4 million."""
-            even_fibonacci = (x for x in fibonacci_gen() if x % 2 ==0)
-            l=list(takewhile(lambda x: x < n, even_fibonacci))
-            return sum(l)
-
-        assert_equal(problem2(10),10)
-        assert_equal(problem2(100),44)
-        assert_equal(problem2(4E6),4613732)
+        #mod 1000000007 has the effect of using int32 only
+        assert_equal(fibonacci(int(1E19),1000000007),647754067)
 
 class TestIsInteger:
     def test_is_integer(self):
@@ -620,7 +613,20 @@ class TestCeildiv:
 
 class TestFibonacciGen:
     def test_fibonacci_gen(self):
-        pass #tested in test_oeis
+        #also tested in test_oeis
+        
+        # https://projecteuler.net/problem=2
+        from itertools import takewhile
+
+        def problem2(n):
+            """Find the sum of all the even-valued terms in the Fibonacci < 4 million."""
+            even_fibonacci = (x for x in fibonacci_gen() if x % 2 ==0)
+            l=list(takewhile(lambda x: x < n, even_fibonacci))
+            return sum(l)
+
+        assert_equal(problem2(10),10)
+        assert_equal(problem2(100),44)
+        assert_equal(problem2(4E6),4613732)
 
 class TestCatalanGen:
     def test_catalan_gen(self):
@@ -903,6 +909,36 @@ class TestMultiply:
             b=getrandbits(bits)
             assert_equal(multiply(a,b),a*b)
             
+
+class TestSqrt:
+    def test_sqrt(self):
+        # assert_equal(expected, sqrt(n))
+        raise SkipTest # TODO: implement your test here
+
+class TestModMatmul:
+    def test_mod_matmul(self):
+        # assert_equal(expected, mod_matmul(A, B, mod))
+        raise SkipTest # TODO: implement your test here
+
+class TestModMatpow:
+    def test_mod_matpow(self):
+        a=[[1, 2],[1, 0]]
+        b=matrix_power(a,50)
+        assert_equal(
+            b, 
+            [[750599937895083, 750599937895082], 
+             [375299968947541, 375299968947542]]
+        )
+
+class TestZeros:
+    def test_zeros(self):
+        # assert_equal(expected, zeros(shape))
+        raise SkipTest # TODO: implement your test here
+
+class TestDiag:
+    def test_diag(self):
+        # assert_equal(expected, diag(v))
+        raise SkipTest # TODO: implement your test here
 
 if __name__ == "__main__":
     runmodule()

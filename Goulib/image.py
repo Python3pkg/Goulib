@@ -3,7 +3,6 @@
 
 
 from __future__ import division #"true division" everywhere
-from _hashlib import new
 
 """
 image processing with PIL's ease and skimage's power
@@ -148,10 +147,12 @@ class Image(Plot):
             self.palette
         except AttributeError:
             self.palette=None
-            try:
-                self.setpalette(kwargs['colormap'])
-            except (AssertionError,KeyError):
-                pass
+            for arg in ['colormap','palette','colors']: #aliases
+                try:
+                    self.setpalette(kwargs[arg])
+                    break # found it
+                except (AssertionError,KeyError):
+                    pass
                 
 
     def _set(self,data,mode=None,copy=False):
@@ -168,6 +169,7 @@ class Image(Plot):
                 data=np.transpose(data,(1,2,0))
         self.mode=mode or guessmode(data)
         self.array=skimage.util.dtype.convert(data,modes[self.mode].type)
+    
 
     @property
     def shape(self):
@@ -209,23 +211,14 @@ class Image(Plot):
             with io.util.file_or_url_context(path) as context:
                 data = io.imread(context)
         mode=guessmode(data)
-        self._set(data,'F' if mode in 'U' else mode)
+        self._set(data,mode)
         return self
 
-    @staticmethod
-    def open(path):
-        """PIL(low) compatibility"""
-        return Image(path)
-
-    @staticmethod
-    def new(mode, size, color='black'):
-        """PIL(low) compatibility"""
-        return Image(mode=mode, size=size, color=color)
-
-    def save(self, path, autoconvert=True, **kwargs):
+    def save(self, path, autoconvert=True, format_str=None, **kwargs):
         """saves an image
         :param path: string with path/filename.ext
         :param autoconvert: bool, if True converts color planes formats to RGB
+        :param format_str: str of file format. set to 'PNG' by skimage.io.imsave
         :param kwargs: optional params passed to skimage.io.imsave:
         :return: self for chaining
         """
@@ -235,10 +228,42 @@ class Image(Plot):
                 mode='L'
             elif self.mode not in 'RGBA': #modes we can save directly
                 mode='RGB'
-        im=self.convert(mode)
-        skimage.io.imsave(path,im.array,**kwargs)
+        a=self.convert(mode).array # makes sure we have a copy of self.array
+        if format_str is None and isinstance(path,six.string_types):
+            format_str=path.split('.')[-1][:3]
+        if format_str.upper()=='TIF':
+            a=skimage.img_as_uint(a)
+        else: #tiff plugin doesn't like format_str arg
+            kwargs['format_str']=format_str.upper()    
+        from skimage import io
+        io.imsave(path,a,**kwargs)
         return self
 
+    def _repr_svg_(self, **kwargs):
+        raise NotImplementedError() #and should never be ...
+        #... because it causes _repr_png_ to be called by Plot._repr_html_
+        # instead of render below
+
+    def render(self, fmt='PNG',**kwargs):
+        buffer = six.BytesIO()
+        self.save(buffer, format_str=fmt, **kwargs)
+        #self.save(buffer)
+        #im=self.pil
+        #im.save(buffer, fmt)
+        return buffer.getvalue()
+
+    # methods for PIL.Image compatibility (see http://effbot.org/imagingbook/image.htm )
+    
+    @staticmethod
+    def open(path):
+        """PIL(low) compatibility"""
+        return Image(path)
+
+    @staticmethod
+    def new(mode, size, color='black'):
+        """PIL(low) compatibility"""
+        return Image(mode=mode, size=size, color=color)
+    
     @property
     def pil(self):
         """convert to PIL(low) Image
@@ -249,19 +274,7 @@ class Image(Plot):
         if self.mode=='P':
             im.putpalette(self.palette.pil)
         return im
-
-    def _repr_svg_(self, **kwargs):
-        raise NotImplementedError() #and should never be ...
-        #... because it causes _repr_png_ to be called by Plot._repr_html_
-        # instead of render below
-
-    def render(self, fmt='png'):
-        im=self.pil
-        buffer = six.BytesIO()
-        im.save(buffer, fmt)
-        return buffer.getvalue()
-
-    # methods for PIL.Image compatibility (see http://effbot.org/imagingbook/image.htm )
+    
     def getdata(self,dtype=np.uint8,copy=True):
         a=self.array
         if a.dtype==dtype:
@@ -298,6 +311,8 @@ class Image(Plot):
             return self.array[yx[0],yx[1],:]
 
     def putpixel(self,yx,value):
+        if isinstance(value,Color):
+            value=value.convert(self.mode)
         if self.nchannels==1:
             self.array[yx[0],yx[1]]=value
         else:
@@ -413,6 +428,7 @@ class Image(Plot):
             * ANTIALIAS (a high-quality downsampling filter)
         :param kwargs: axtra parameters passed to skimage.transform.resize
         """
+           
         from skimage.transform import resize
         order=0 if filter in (None,PILImage.NEAREST) else 1 if filter==PILImage.BILINEAR else 3
         order=kwargs.pop('order',order)
@@ -634,6 +650,13 @@ class Image(Plot):
             s[1]
         except:
             s=[s,s]
+            
+        if self.mode=='P':
+            a=self.array
+            for axis,r in enumerate(s):
+                a=np.repeat(a,r,axis=axis)
+            return Image(a, 'P', colors=self.palette)
+        
         w,h=self.size
         return self.resize((int(w*s[0]+0.5),int(h*s[1]+0.5)))
 
@@ -718,6 +741,14 @@ class Image(Plot):
 
     def __sub__(self,other):
         return self.sub(other)
+    
+    def deltaE(self,other):
+        import skimage.color as skcolor
+        a=skcolor.deltaE_ciede2000(
+            self.convert('lab').array,
+            other.convert('lab').array,
+        )
+        return Image(a,'F')
 
     def __mul__(self,other):
         if isinstance(other,six.string_types):
@@ -831,7 +862,8 @@ def pure_pil_alpha_to_color_v2(image, color=(255, 255, 255)):
 
 def disk(radius,antialias=PILImage.ANTIALIAS):
     from skimage.draw import circle, circle_perimeter_aa
-    size = (2*radius, 2*radius)
+    size = math2.rint(2*radius)
+    size=(size,size)
     img = np.zeros(size, dtype=np.double)
     rr, cc = circle(radius,radius,radius)
     img[rr, cc] = 1
@@ -968,10 +1000,12 @@ class Ditherer(object):
         return self.name
 
 class ErrorDiffusion(Ditherer):
-    def __init__(self,name, positions,weights):
+    def __init__(self,name, positions,weights,wsum=None):
         Ditherer.__init__(self,name,None)
-        self.weights = weights / np.sum(weights)
-        self.positions=positions
+        if not wsum :
+            wsum=sum(weights)
+        weights=math2.vecdiv(weights,wsum)
+        self.matrix=list(zip(positions, weights))
 
     def __call__(self, image, N=2):
         image=skimage.img_as_float(image, True) #normalize to [0..1]
@@ -986,7 +1020,7 @@ class ErrorDiffusion(Ditherer):
 
                 # Propagate quantization noise
                 d = (image[i, j] - out[i, j] / (N - 1))
-                for (ii, jj), w in zip(self.positions, self.weights):
+                for (ii, jj), w in self.matrix:
                     ii = i + ii
                     jj = j + jj
                     if ii < rows and jj < cols:
@@ -1007,9 +1041,12 @@ class FloydSteinberg(ErrorDiffusion):
 #PIL+SKIMAGE dithering methods
 from PIL.Image import NEAREST, ORDERED, RASTERIZE, FLOYDSTEINBERG
 PHILIPS=FLOYDSTEINBERG+1
-SIERRA=FLOYDSTEINBERG+2
-STUCKI=FLOYDSTEINBERG+3
-RANDOM=FLOYDSTEINBERG+10
+SIERRA=PHILIPS+1
+STUCKI=SIERRA+1
+JARVIS=STUCKI+1
+ATKINSON=JARVIS+1
+BURKES=ATKINSON+1
+RANDOM=JARVIS+10
 
 dithering={
     NEAREST : Ditherer('nearest',quantize),
@@ -1022,13 +1059,35 @@ dithering={
     SIERRA: ErrorDiffusion('sierra lite',
         [(0, 1), (1, -1), (1, 0)],[2, 1, 1]),
     STUCKI: ErrorDiffusion('stucki',
-        positions = [(0, 1), (0, 2), (1, -2), (1, -1),
-            (1, 0), (1, 1), (1, 2),
+        positions = [(0, 1), (0, 2), 
+            (1, -2), (1, -1), (1, 0), (1, 1), (1, 2),
             (2, -2), (2, -1), (2, 0), (2, 1), (2, 2)],
         weights = [ 8, 4,
                    2, 4, 8, 4, 2,
                    1, 2, 4, 2, 1]
         ),
+    JARVIS: ErrorDiffusion('Jarvis, Judice, and Ninke',
+    #http://www.tannerhelland.com/4660/dithering-eleven-algorithms-source-code/
+        positions = [(0, 1), (0, 2), 
+            (1, -2), (1, -1), (1, 0), (1, 1), (1, 2),
+            (2, -2), (2, -1), (2, 0), (2, 1), (2, 2)],
+        weights = [ 7, 5,
+                   3, 5, 7, 5, 3,
+                   1, 3, 4, 3, 1]
+        ),
+    ATKINSON: ErrorDiffusion('Atkinson',
+        positions = [(0, 1), (0, 2),
+            (1, -1), (1, 0), (1, 1),
+            (2, 0)],
+        weights = [1,1,1,1,1,1],
+        wsum=8
+        ),
+        
+    BURKES:  ErrorDiffusion('Burkes',
+        positions = [(0, 1), (0, 2),
+            (1, -2), (1, -1), (1, 0), (1, 1), (1, 2)],
+        weights = [8, 4, 2, 4, 8, 4, 2]
+    ),
 }
 
 def dither(image, method=FLOYDSTEINBERG, N=2):
