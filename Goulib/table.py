@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf8
 """
-"mini pandas.DataFrame" 
+"mini pandas.DataFrame"
 Table class with Excel + CSV I/O, easy access to columns, HTML output, and much more.
 """
 __author__ = "Philippe Guglielmetti"
@@ -13,8 +13,6 @@ import six, logging
 from six.moves import html_parser, reduce
 
 import csv, itertools, codecs, json, collections
-
-
 
 import pandas
 from pandas.core.common import PandasError
@@ -28,7 +26,7 @@ except: #ElementTree
     from xml.etree import ElementTree
     from html_parser import HTMLParser
     defaultparser=HTMLParser
-    
+
 Element=ElementTree._Element
 
 import datetime as std_datetime
@@ -44,10 +42,10 @@ def attr(args):
         k="class" if key=="_class" else key
         res+=' %s="%s"'%(k,val)
     return res
-   
+
 class Table(pandas.DataFrame):
     """Table class with CSV I/O, easy access to columns, HTML output"""
-    
+
     def __init__(self,data=None, index=None, columns=None, copy=False, **kwargs):
         """inits a table, optionally by reading a Excel, csv or html file
         :param data: list of list of cells, or string as filename
@@ -62,7 +60,7 @@ class Table(pandas.DataFrame):
         elif isinstance(data,pandas.DataFrame):
             columns=columns or data.columns
             index=index or data.index
-            
+
         try:
             super().__init__(data,index=index,columns=columns,copy=copy)
         except PandasError:
@@ -70,26 +68,45 @@ class Table(pandas.DataFrame):
             if columns is None:
                 columns=range(data.shape[1])
             super().__init__(data,index=index,columns=columns,copy=copy)
-        
+
         if filename:
             self.load(filename,**kwargs)
-            
+
     def _init_from(self,dataframe):
         self._data=dataframe._data
         self.__finalize__(dataframe) #copy metadata
         return self
     
+    # iterators. DataFrame has a column based default iterator,
+    # while Table had a row based one, which seems more logical for many applications
+    # so here we define both:
+    
+    def __iter__(self):
+        logging.warning('ambiguous. Please prefer Table.rows or Table.cols iterators')
+        return super().__iter__()
+    
+    @property
+    def cols(self):
+        """Iterate over infor axis"""
+        return iter(self._info_axis)
+    
+    @property
+    def rows(self):
+        """Iterate over rows"""
+        for k,row in self.iterrows():
+            yield row.values
+
     @property
     def titles(self):
         res=self.axes[-1]
         return res.values
-    
+
     def row(self,key):
-        return Row(self.loc[[key]],copy=False) 
-    
+        return Row(self.loc[[key]],copy=False)
+
     def row_as_list(self,key):
         return self.row(key).values.tolist()[0]
-    
+
     def __getitem__(self, key):
         """Table uses [row] or [row,col] indexing"""
         if isinstance(key,tuple):
@@ -101,38 +118,38 @@ class Table(pandas.DataFrame):
             return self.row(key)
         res=super().__getitem__(key)
         return res
-    
+
     def __setitem__(self, key,value):
         """Table allows [row] or [row,col] indexing"""
         if isinstance(key,tuple):
-            keydf=tuple((key[1],key[0]))
+            # http://stackoverflow.com/questions/13842088/set-value-for-particular-cell-in-pandas-dataframe
+            return self.set_value(key[0],key[1],value)
         else:
-            keydf=key
-        return super().__setitem__(keydf,value)
-            
-    
+            return super().__setitem__(key,value)
+
+
     def col(self,key):
         return self[key].values.tolist()
-    
+
     def addcol(self,title,val=None,i=0):
         """add column to the right"""
         if not isiterable(val):
             val=[val]*(len(self)-i)
         self[title] = pandas.Series(val, index=self.index)
         return self
-    
+
     def __eq__(self,other):
         return self.equals(other)
-    
+
     def __ne__(self,other):
         return not self.equals(other)
-            
+
     def load(self,filename,**kwargs):
-        if self.titles: #explicitly set
+        if any(self.titles): #explicitly set
             l=kwargs.setdefault('titles_line',0)
             kwargs.setdefault('data_line',l+1)
         else: #read titles from the file
-            l=kwargs.setdefault('titles_line',1) 
+            l=kwargs.setdefault('titles_line',1)
             kwargs.setdefault('data_line',l+1)
         ext=filename.split('.')[-1].lower()
         if ext in ('xls','xlsx'):
@@ -144,16 +161,18 @@ class Table(pandas.DataFrame):
         else: #try ...
             self.read_csv(filename,**kwargs)
         return self #to allow chaining
-    
+
     def read_xls(self, filename, **kwargs):
         """appends an Excel table"""
         titles_line=kwargs.pop('titles_line',1)-1
         data_line=kwargs.pop('data_line',2)-1
         sheetname=kwargs.pop('sheet',0)
-        
+        kwargs.setdefault('skiprows',list(range(0,titles_line)))
+        kwargs.setdefault('index',titles_line)
+
         res=pandas.read_excel(filename,sheetname,**kwargs)
         return self._init_from(res)
-    
+
     def applyf(self,col,f,skiperrors=False):
         """ apply a function to a column
         :param col: column name of number
@@ -164,7 +183,7 @@ class Table(pandas.DataFrame):
         res=True
         self[col] = self[col].apply(f)
         return res
-    
+
     def _datetimeformat(self,by,fmt,function,skiperrors):
         """convert a column to a date, time or datetime
         :param by: column name of number
@@ -178,39 +197,39 @@ class Table(pandas.DataFrame):
                 res=self._datetimeformat(by, f, function, True if f!=fmt[-1] else skiperrors)
             return res
         return self.applyf(by,lambda x: function(x,fmt=fmt),skiperrors)
-            
+
     def to_datetime(self,by,fmt='%Y-%m-%d %H:%M:%S',skiperrors=False):
         """convert a column to datetime
         """
         return self._datetimeformat(by, fmt, datetimef, skiperrors)
-        
+
     def to_date(self,by,fmt='%Y-%m-%d',skiperrors=False):
         """convert a column to date
         """
         return self._datetimeformat(by, fmt, datef, skiperrors)
-    
+
     def to_time(self,by,fmt='%H:%M:%S',skiperrors=False):
         """convert a column to time
         """
         return self._datetimeformat(by, fmt, timef, skiperrors)
-    
+
     def to_timedelta(self,by,fmt=None,skiperrors=False):
         """convert a column to time
         """
         return self._datetimeformat(by, fmt, timedeltaf, skiperrors)
-    
+
     def _repr_html_(self):
         return self.style._repr_html_()
-    
+
     def html(self):
         return self.style.render()
-    
+
     '''
-            
+
     def __repr__(self):
         """:return: repr string of titles+5 first lines"""
         return 'Table(len=%d,titles=%s,data=%s)'%(len(self),self.titles,self[:5])
-    
+
     def __str__(self):
         """:return: string of full tables with linefeeds"""
         res=''
@@ -219,13 +238,13 @@ class Table(pandas.DataFrame):
         for line in self:
             res+=str(line)+'\n'
         return res
-    
+
     def _repr_html_(self):
         return self.html()
-    
+
     def html(self,head=None,foot=None,colstyle={},**kwargs):
         """HTML representation of table
-        
+
         :param head: optional column headers, .titles by default
         :param foot: optional column footers, .footer by default
         :param style: (list of) dict of style attributes
@@ -237,27 +256,27 @@ class Table(pandas.DataFrame):
             are displayed before and/or after the lines
         :return: string HTML representation of table
         """
-                
+
         def TR(data,align=None,fmt=None,tag=None,style={}):
             res=''
             row=Row(data=data,align=align,fmt=fmt,tag=tag,style=style)
             res+=row.html()+'\n'
             return res
-            
+
         def THEAD(data,fmt=None,style={}):
             res="<thead>\n"
             res+=TR(data=data,fmt=fmt,tag='th',style=style)
             res+="</thead>\n"
             return res
-            
+
         def TFOOT(data,fmt=None,style={}):
             res="<tfoot>\n"
             res+=TR(data=data,fmt=fmt,tag='th',style=style)
             res+="</tfoot>\n"
             return res
-        
+
         res=''
-            
+
         if head is None:
             head=self.titles
         if head:
@@ -265,18 +284,18 @@ class Table(pandas.DataFrame):
         start=kwargs.pop('start',0)
         stop=kwargs.pop('stop',len(self))
         if start!=0:
-            res+=TR(['...']*self.ncols(),style=colstyle)  
+            res+=TR(['...']*self.ncols(),style=colstyle)
         for row in self[start:stop]:
-            res+=TR(row,style=colstyle)  
+            res+=TR(row,style=colstyle)
         if stop!=-1 and stop<len(self):
-            res+=TR(['...']*self.ncols(),style=colstyle)  
+            res+=TR(['...']*self.ncols(),style=colstyle)
         if foot is None:
             foot=self.footer
         if foot:
-            res+=TFOOT(foot)             
-        
+            res+=TFOOT(foot)
+
         return tag('table',res,**kwargs)+'\n'
-    
+
     def read_element(self,element, **kwargs):
         """read table from a DOM element.
         :Warning: drops all formatting
@@ -302,7 +321,7 @@ class Table(pandas.DataFrame):
                 self.append(data)
             line=line+1
         return self
-    
+
     def read_html(self,filename, **kwargs):
         """read first table in HTML file
         """
@@ -311,46 +330,46 @@ class Table(pandas.DataFrame):
         try:
             if element.tag!='table': # file contains table as topmost tag
                 element = element.find('.//table') #find first table
-        except: 
+        except:
             pass
-        
+
         if element is None:
             raise LookupError('no table found in file')
-        
+
         self.read_element(element, **kwargs)
         return self
-    
+
     def read_json(self,filename, **kwargs):
         """appends a json file made of lines dictionaries"""
         with open(filename, 'r') as file:
             for row in json.load(file):
                 self.append(row)
         return self
-        
+
     def read_csv(self, filename, **kwargs):
         """appends a .csv or similar file to the table"""
         titles_line=kwargs.pop('titles_line',1)-1
         data_line=kwargs.pop('data_line',2)-1
-        
+
         dialect=kwargs.setdefault('dialect',csv.excel)
         delimiter=kwargs.setdefault('delimiter',';')
         encoding=kwargs.pop('encoding','utf-8') #must be iso-8859-15 in some cases
         errors=kwargs.pop('errors','strict')
-        
+
         def csv_reader2(): # version for Python 2
             with codecs.open(filename, 'rb', errors=errors) as f:
                 csv_reader = csv.reader(f, **kwargs)
                 for row in csv_reader:
                     yield [unicode(cell, encoding) for cell in row]
-        
+
         def csv_reader3():  # version for Python 3
             with open(filename, 'rt', errors=errors, encoding=encoding) as f:
                 csv_reader = csv.reader(f, **kwargs)
                 for row in csv_reader:
                     yield row
-        
+
         reader = csv_reader2() if six.PY2 else csv_reader3()
-        
+
         for i,row in enumerate(reader):
             if i==titles_line: #titles can have no left/right spaces
                 self.titles=[Cell.read(x) for x in row]
@@ -359,7 +378,7 @@ class Table(pandas.DataFrame):
                 if line!=[None]: #strange last line sometimes ...
                     self.append(line)
         return self
-    
+
     def save(self,filename,**kwargs):
         ext=filename.split('.')[-1].lower()
         if ext in ('xls','xlsx'):
@@ -373,7 +392,7 @@ class Table(pandas.DataFrame):
         else: #try ...
             self.write_csv(filename,**kwargs)
         return self #to allow chaining
-    
+
     def write_xlsx(self,filename, **kwargs):
         import xlsxwriter
 
@@ -382,7 +401,7 @@ class Table(pandas.DataFrame):
         df=workbook.add_format({'num_format': 'dd/mm/yyyy'})
         tf=workbook.add_format({'num_format': 'hh:mm:ss'})
         dtf=workbook.add_format({'num_format': 'dd/mm/yyyy hh:mm:ss'})
-        
+
         def writerow(i,line):
             for j,s in enumerate(line):
                 if isinstance(s, datetime):
@@ -393,14 +412,14 @@ class Table(pandas.DataFrame):
                      worksheet.write_datetime(i, j,s,tf)
                 else:
                     worksheet.write(i, j,s)
-                
+
         writerow(0,self.titles)
         for i,row in enumerate(self):
             writerow(i+1,row)
-        
+
         workbook.close()
         return self
-    
+
     def json(self, **kwargs):
         """
         :return: string JSON representation of table
@@ -415,24 +434,24 @@ class Table(pandas.DataFrame):
         array=[self.rowasdict(i) for i in range(len(self))]
         kwargs.setdefault('default',json_serial)
         return json.dumps(array, **kwargs)
-            
+
     def write_csv(self,filename, **kwargs):
         """ write the table in Excel csv format, optionally transposed"""
-    
+
         dialect=kwargs.get('dialect','excel')
         delimiter=kwargs.get('delimiter',';')
         encoding=kwargs.pop('encoding','utf-8') #was iso-8859-15 earlier
         empty=''.encode(encoding)
-        
+
         if six.PY3 :
             f = open(filename, 'w', newline='', encoding=encoding)
-            def _encode(line): 
+            def _encode(line):
                  return [s for s in line]
         else: #Python 2
             f = open(filename, 'wb')
-            def _encode(line): 
+            def _encode(line):
                 return [empty if s is None else unicode(s).encode(encoding) for s in line]
-        
+
         writer=csv.writer(f, dialect=dialect, delimiter=delimiter)
         if self.titles:
             s=_encode(self.titles)
@@ -442,7 +461,7 @@ class Table(pandas.DataFrame):
             writer.writerow(s)
         f.close()
         return self
-    
+
     def __eq__(self,other):
         """compare 2 Tables contents, mainly for tests"""
         if self.titles!=other.titles:
@@ -453,13 +472,13 @@ class Table(pandas.DataFrame):
             if self[i]!=other[i]:
                 return False
         return True
-    
+
     def ncols(self):
         """
         :return: number of columns, ignoring title
         """
         return reduce(max,list(map(len,self)))
-                
+
     def find_col(self,title):
         """finds a column from a part of the title"""
         title=title.lower()
@@ -476,7 +495,7 @@ class Table(pandas.DataFrame):
             return self.titles.index(column)
         except ValueError:
             return None
-    
+
     def icol(self,column):
         """iterates a column"""
         i=self._i(column)
@@ -485,19 +504,19 @@ class Table(pandas.DataFrame):
                 yield row[i]
             except:
                 yield None
-                
+
     def col(self,column,title=False):
         i=self._i(column)
         res=[x for x in self.icol(i)]
         if title:
             res=[self.titles[i]]+res
         return res
-    
+
     def cols(self,title=False):
         """iterator through columns"""
         for i in range(self.ncols()):
             yield self.col(i,title)
-            
+
     def transpose(self,titles_column=0):
         """transpose table
         :param: titles_column
@@ -510,7 +529,7 @@ class Table(pandas.DataFrame):
             else:
                 res.append(row)
         return res
-    
+
     def index(self,value,column=0):
         """
         :return: int row number of first line where column contains value
@@ -519,19 +538,19 @@ class Table(pandas.DataFrame):
             if v==value:
                 return i
         return None
-        
+
     def get(self,row,col):
         return self[row,col]
-        
-    
+
+
     def set(self,row,col,value):
         col=self._i(col)
-        if row>=len(self): 
+        if row>=len(self):
             self.extend([list()]*(1+row-len(self)))
         if col>=len(self[row]):
             self[row].extend([None]*(1+col-len(self[row])))
         self[row][col]=value
-    
+
     def setcol(self,col,value,i=0):
         """set column values
         :param col: int or string column index
@@ -546,7 +565,7 @@ class Table(pandas.DataFrame):
         else:
             for i in range(i,len(self)):
                 self.set(i,j,value)
-            
+
     def append(self,line):
         """appends a line to table
         :param line: can be either:
@@ -564,8 +583,8 @@ class Table(pandas.DataFrame):
         else:
             list.append(self,list(line))
         return self
-            
-            
+
+
     def sort(self,by,reverse=False):
         """sort by column"""
         i=self._i(by)
@@ -573,23 +592,23 @@ class Table(pandas.DataFrame):
             list.sort(self,key=lambda x:x[i],reverse=reverse)
         else:
             list.sort(i,reverse=reverse)
-    
+
     def rowasdict(self,i):
         """returns a line as a dict"""
         return collections.OrderedDict(zip(self.titles,self[i]))
-    
+
     def asdict(self):
         for i in range(len(self)):
             yield self.rowasdict(i)
-        
+
     def groupby_gen(self,by,sort=True,removecol=True):
         """generates subtables
         """
         i=self._i(by)
         t=self.titles
         if removecol: t=t[:i]+t[i+1:]
-        if sort: 
-            self.sort(i) 
+        if sort:
+            self.sort(i)
         else:
             pass #groupby will group CONSECUTIVE lines with same i, so entries at bottom of table will replace the earlier entries in dict
         for k, g in itertools.groupby(self, key=lambda x:x[i]):
@@ -598,15 +617,15 @@ class Table(pandas.DataFrame):
             else:
                 r=Table(titles=t,data=list(g))
             yield k,r
-    
+
     def groupby(self,by,sort=True,removecol=True):
         """ ordered dictionary of subtables
         """
         return collections.OrderedDict(
             (k,t) for (k,t) in self.groupby_gen(by,sort,removecol)
         )
-        
-    
+
+
     def hierarchy(self,by='Level',
                   factory=lambda row:(row,[]),          #creates an object from a line
                   linkfct=lambda x,y,row:x[1].append(y) #creates a parend/child relation between x and y. raw is also available (for qty)
@@ -615,17 +634,17 @@ class Table(pandas.DataFrame):
         res=[]
         i=self._i(by)
         stack=[]
-        for row in self:          
-            obj=factory(row)   
-            level=row[i]  
+        for row in self:
+            obj=factory(row)
+            level=row[i]
             if level==1:
                 res.append(obj)
             while level<=len(stack):
-                stack.pop()  
+                stack.pop()
             if stack:
-                linkfct(stack[-1],obj,row)     
+                linkfct(stack[-1],obj,row)
             stack.append(obj)
-        return res       
+        return res
 
     def total(self,funcs):
         """build a footer row by appling funcs to all columns
@@ -638,7 +657,7 @@ class Table(pandas.DataFrame):
             except:
                 self.footer.append(f)
         return self.footer
-    
+
     def remove_lines_where(self,f,value=(None,0,'')):
         """
         :param f: function of the form lambda line:bool returning True if line should be removed
@@ -650,18 +669,18 @@ class Table(pandas.DataFrame):
         from .itertools2 import removef
         return len(removef(self,f))
 '''
-    
-class Row(Table):
+
+class Row(pandas.DataFrame):
     """ a DataFrame of a single Table row"""
     def __getitem__(self, key):
         if isinstance(key,int):
             key=self.titles[key]
-        res=super(Table,self).__getitem__(key)
+        res=super().__getitem__(key)
         return res.values[0] if res.size==1 else res
     def __setitem__(self, key,value):
         if isinstance(key,int):
             key=self.titles[key]
-        return super(Table,self).__setitem__(key,value)
+        return super().__setitem__(key,value)
 
 '''
 class Row(object):
@@ -674,41 +693,41 @@ class Row(object):
         :param tag: (list of) tags called to build each cell. defaults to 'td'
         :param style: (list of) dict or string for HTML style attribute
         """
-        
-        if not isiterable(data) : 
+
+        if not isiterable(data) :
             data=[data]
         data=list(data) #to make it mutable
-            
+
         #ensure params have the same length as data
-        
+
         if not isinstance(style,list): style=[style]
         style=style+[None]*(len(data)-len(style))
-        
+
         if not isinstance(align,list): align=[align]
         align=align+[None]*(len(data)-len(align))
-        
+
         if not isinstance(fmt,list)  : fmt=[fmt]
         fmt=fmt+[None]*(len(data)-len(fmt))
-        
+
         if not tag:tag='td'
-        if not isinstance(tag,list)  : 
+        if not isinstance(tag,list)  :
             tag=[tag]*(len(data)) #make a full row, in case it's a 'th'
         tag=tag+[None]*(len(data)-len(fmt)) #fill the row with None, which will be 'td's
-            
+
         for i,cell in enumerate(data):
             if not isinstance(cell,Cell):
                 cell=Cell(cell,align[i],fmt[i],tag[i],style[i])
             else:
                 pass #ignore attribs for now
             data[i]=cell
-        
 
-       
+
+
         self.data=data
-        
+
     def __repr__(self):
         return str(self.data)
-        
+
             def _repr_html_(self):
         return self.html()
 
@@ -719,10 +738,10 @@ class Row(object):
             cell=Cell(v)
             res+=cell.html(**cell_args)
         return tag('tr',res,**kwargs)
-    
+
 
 '''
-    
+
 class Cell(object):
     """Table cell with HTML attributes"""
     def __init__(self,data=None,align=None,fmt=None,tag=None,style={}):
@@ -733,11 +752,11 @@ class Cell(object):
         :param tag: called to build each cell. defaults to 'td'
         :param style: dict or string for HTML style attribute
         """
-        
+
         if isinstance(data,Element):
             tag=data.tag
             assert(tag in ('td','th'))
-            
+
             def _recurse(data):
                 "grab all possible text from the cell content"
                 if data is None:
@@ -748,12 +767,12 @@ class Cell(object):
                 if data.tail:
                     s=s+data.tail
                 return s
-                    
+
             data=Cell.read(_recurse(data))
-            
+
         if isinstance(data,str):
             data=data.lstrip().rstrip() #remove spaces, but also trailing \r\n
-                    
+
         self.data=data
         self.align=align
         self.fmt=fmt
@@ -761,13 +780,13 @@ class Cell(object):
         if not isinstance(style,dict):
             style=style_str2dict(style)
         self.style=style
-        
+
     def __repr__(self):
         return str(self.data)
-    
+
     def _repr_html_(self):
         return self.html()
-    
+
     @staticmethod
     def read(x):
         """interprets x as int, float, string or None"""
@@ -778,34 +797,34 @@ class Cell(object):
         except:
             if x=='': x=None
         return x
-        
+
     def html(self,**kwargs):
         """:return: string HTML formatted cell:
-        
+
         * if data is int, default align="right"
         * if data is float, default align="right" and fmt='%0.2f'
         * if data is :class:`~datetime.timedelta`, align = "right" and formatting is done by :func:`datetime2.strftimedelta`
-        
+
         """
         args={}
         args.update(kwargs) #copy needed to avoid side effects
-        
+
         v=self.data
         f=self.fmt
-        
+
         if hasattr(v,'_repr_html_'):
             try:
                 s=v._repr_html_()
             except Exception as e:
                 s='ERROR : %s _repr_html_ failed : %s'%(v,e)
             return tag(self.tag,s,**args)
-        
+
         style=args.get('style',{})
         if not isinstance(style,dict):
             style=style_str2dict(style)
-            
+
         if not 'text-align' in style: #HTML 4 and before
-            a=args.pop('align',self.align)           
+            a=args.pop('align',self.align)
             if isinstance(v,int):
                 if not a: a="right"
             elif isinstance(v,float):
@@ -823,19 +842,19 @@ class Cell(object):
                 if not f: f='%H:%M:%S'
                 v=strftimedelta(v,f)
                 f=None #don't reformat below
-                
+
             if a:
                 style['text-align']=a
-            
+
         # create style dict by merging default Cell style + parameters
         style=dict(self.style,**style) #http://stackoverflow.com/questions/9819602/union-of-dict-objects-in-python
         if style:
             args['style']=style
-        
+
         if v is None or v=='':
             v="&nbsp;" #for IE8
         else:
             v=f%v if f else six.text_type(v)
         return tag(self.tag,v,**args)
-    
-                
+
+
