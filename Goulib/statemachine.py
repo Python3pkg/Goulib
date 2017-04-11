@@ -4,7 +4,6 @@
 """
 state machines with graph representation
 """
-from scipy.stats.mstats_basic import argstoarray
 
 __author__ = "Marc Nicole"
 __copyright__ = "Copyright 2015, Marc Nicole"

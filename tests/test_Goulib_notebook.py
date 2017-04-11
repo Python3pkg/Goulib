@@ -5,6 +5,10 @@ from nose.tools import assert_equal
 from nose import SkipTest
 #lines above are inserted automatically by pythoscope. Line below overrides them
 from Goulib.tests import *
+from Goulib.notebook import *
+
+#TODO: Find how to test this ...
+
 class TestH1:
     def test_h1(self):
         # assert_equal(expected, h1(*args))

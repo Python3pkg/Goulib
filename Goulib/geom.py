@@ -125,12 +125,12 @@ def argPair(x,y=None):
     if y is None:
         try:
             return (x[0], x[1])
-        except:
+        except Exception:
             pass
     
         try:
             return x.xy
-        except:
+        except Exception:
             pass
     else:
         return (x,y)
@@ -333,11 +333,11 @@ class Vector2(object):
         """
         try: #quick
             if self.xy == other.xy : return True
-        except:
+        except Exception:
             pass
         try:
             if self.x == other[0] and self.y == other[1]: return True
-        except:
+        except Exception:
             pass
         return isclose((self-Vector2(other)).mag(),0,_reltol)
 
@@ -661,10 +661,10 @@ class Point2(Vector2, Geometry):
         """
         try: #quick for other Point2
             dx,dy=self.x-other.x,self.y-other.y
-        except:
+        except Exception:
             try: #also quick for
                 dx,dy=self.x-other[0],self.y-other[1]
-            except: # for all other objects
+            except Exception: # for all other objects
                 return self.connect(other).length
         return hypot(dx,dy)
     
@@ -784,7 +784,7 @@ class Line2(Geometry):
         """
         try:
             return self.p==other.p and self.v==other.v
-        except:
+        except Exception:
             return False
 
     def __repr__(self):
@@ -1129,10 +1129,11 @@ class Arc2(Circle):
 
     def intersect(self, other):
         inters= other._intersect_circle(self)
-        if not inters: return None
+        if not inters: 
+            return None
         try:
             inters[1]
-        except:
+        except IndexError:
             inters=tuple(inters)
         res=[]
         for pt in inters:
@@ -1160,13 +1161,13 @@ class Ellipse(Circle):
         if len(args) == 1: # Circle or derived class
             try:
                 self.r2 = args[0].r2
-            except:
+            except Exception:
                 self.r2 = self.r
         else: #2 first params are used to stay compatible with Arc2
             try:
                 self.r2 = args[2]
                 self.p = self.c+Vector2(self.r,self.r2) #for coherency + transform
-            except:
+            except Exception :
                 self.p=Point2(args[1]) #point at ellipse "corner"
                 self.r,self.r2=(self.p-self.c).xy
 
@@ -1176,7 +1177,7 @@ class Ellipse(Circle):
     def __eq__(self, other):
         try:
             other=Ellipse(other) #in case it's a Circle
-        except:
+        except Exception:
             return False
         return self.c==other.c and self.r==other.r and self.r2==other.r2
 
@@ -1461,7 +1462,7 @@ class Matrix3(object):
     def __getitem__(self, key):
         try: #is key a tuple ?
             key=3*key[0]+key[1]
-        except:
+        except Exception:
             pass
         return [self.a, self.e, self.i,
                 self.b, self.f, self.j,
@@ -1470,7 +1471,7 @@ class Matrix3(object):
     def __setitem__(self, key, value):
         try: #is key a tuple ?
             key=3*key[0]+key[1]
-        except:
+        except Exception:
             pass
         L = self[:]
         L[key] = value
@@ -1481,7 +1482,7 @@ class Matrix3(object):
     def __eq__(self,other):
         try:
             return list(self)==list(other)
-        except:
+        except Exception:
             return False
 
     def __sub__(self, other):

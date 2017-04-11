@@ -170,7 +170,7 @@ class Expr(plot.Plot):
             return self.applx(x)
         try: #is x iterable ?
             return [self(x) for x in x]
-        except:
+        except Exception:
             pass
         if x is not None:
             kwargs['x']=x
@@ -255,7 +255,7 @@ class Expr(plot.Plot):
         if math2.is_number(other):
             try:
                 return self()==other
-            except:
+            except Exception:
                 return False
         if not isinstance(other,Expr):
             other=Expr(other)
@@ -265,13 +265,13 @@ class Expr(plot.Plot):
         if math2.is_number(other):
             try:
                 return self()<=other
-            except:
+            except Exception:
                 return False
         if not isinstance(other,Expr):
             other=Expr(other)
         try:
             return float(self())==float(other())
-        except:
+        except Exception:
             return False
 
     def __add__(self,right):

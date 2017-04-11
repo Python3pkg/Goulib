@@ -100,6 +100,12 @@ def enumerates(iterable):
         return six.iteritems(iterable)
     return enumerate(iterable)
 
+def chunks(l, n):
+    """Yield successive n-sized chunks from l."""
+    #http://stackoverflow.com/questions/312443/how-do-you-split-a-list-into-evenly-sized-chunks
+    for i in range(0, len(l), n):
+        yield l[i:i + n]
+
 def arange(start,stop=None,step=1):
     """ range for floats or other types (`numpy.arange` without numpy)
 
@@ -245,7 +251,7 @@ def shape(iterable):
         while True:
             res.append(ilen(iterable))
             iterable=first(iterable)
-    except:
+    except TypeError:
         pass
     return res
 

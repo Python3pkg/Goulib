@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-# coding: utf8
+# -*- coding: utf-8 -*-
 
 from __future__ import division #"true division" everywhere
 
@@ -45,7 +45,7 @@ def data(s):
     #http://stackoverflow.com/questions/807863/how-to-output-list-of-floats-to-a-binary-file-in-python
     try:
         return database[s]
-    except:
+    except IndexError:
         pass
 
     from six.moves.urllib.request import urlopen
@@ -72,13 +72,6 @@ with open(cachef, "rb") as f:
             database[k]=v
         except EOFError:
             break
-
-def check(f,s=None):
-    try:
-        name=f.__name__
-    except:
-        name,f=f,globals()[f]
-    assert_generator(f,s or name,name=name,time_limit=None) #to break as soon as an error happens
 
 class TestOEIS:
 

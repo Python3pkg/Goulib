@@ -251,7 +251,7 @@ class Vector3(object):
     def __eq__(self, other):
         try:
             return self.xyz == other.xyz
-        except:
+        except Exception:
             pass
         # assert hasattr(other, '__len__') and len(other) == 3
         return self.x == other[0] and \
@@ -284,7 +284,7 @@ class Vector3(object):
             return _class(self.x + other.x,
                           self.y + other.y,
                           self.z + other.z)
-        except:
+        except Exception:
             return Vector3(self.x + other[0],
                            self.y + other[1],
                            self.z + other[2])
@@ -295,7 +295,7 @@ class Vector3(object):
             self.x += other.x
             self.y += other.y
             self.z += other.z
-        except:
+        except Exception:
             self.x += other[0]
             self.y += other[1]
             self.z += other[2]
@@ -313,7 +313,7 @@ class Vector3(object):
             return _class(self.x - other.x,
                            self.y - other.y,
                            self.z - other.z)
-        except:
+        except Exception:
             #assert hasattr(other, '__len__') and len(other) == 3
             return Vector3(self.x - other[0],
                            self.y - other[1],
@@ -325,7 +325,7 @@ class Vector3(object):
             return Vector3(other.x - self.x,
                            other.y - self.y,
                            other.z - self.z)
-        except:
+        except Exception:
             # assert hasattr(other, '__len__') and len(other) == 3
             return Vector3(other.x - self[0],
                            other.y - self[1],
@@ -341,7 +341,7 @@ class Vector3(object):
             return _class(self.x * other.x,
                           self.y * other.y,
                           self.z * other.z)
-        except:
+        except Exception:
             # assert type(other) in (int, int, float)
             return Vector3(self.x * other,
                            self.y * other,

@@ -6,6 +6,7 @@ from nose import SkipTest
 from Goulib.tests import *
 
 from Goulib.units import *
+from Goulib.table import Table
 
 class Tests:
     def test_append_col(self):
@@ -27,13 +28,14 @@ class Tests:
         assert_equal('{:f}'.format(cost.to('CHF')),'1.291667 CHF') #warning : Py2 and Py3 have different precision for str(float)
 
     def test002_table(self):
-        t = Table(   'mytable',      ['car',          'bus',                                     'pedestrian'],
-                  [  'speed',        V(120,'km/hour'), V(100,'km/hour'),                          V(5,'km/hour'),
-                     'acceleration', V(1,'m/s^2'),     V(0.1,'m/s^2'),                            V(0.2,'m/s^2'),
-                     'autonomy',     V(600,'km'),      lambda: t['autonomy']['pedestrian']*10,    lambda: t['speed']['pedestrian']*V(6,'hour') #coucou
+        t = Table(   
+            titles=['col',          'car',          'bus',               'pedestrian'],
+            data=[[  'speed',        V(120,'km/hour'), V(100,'km/hour'), V(5,'km/hour')],
+                  ['acceleration', V(1,'m/s^2'),     V(0.1,'m/s^2'),     V(0.2,'m/s^2')],
+                  ['autonomy',     V(600,'km'),      lambda: t['autonomy']['pedestrian']*10,    lambda: t['speed']['pedestrian']*V(6,'hour')],
                   ])
-        assert_count_equal(t.cols,['car',        'bus',         'pedestrian'])
-        assert_count_equal(t.rowLabels,['speed','acceleration','autonomy'])
+        assert_equal(t.cols,['car',        'bus',         'pedestrian'])
+        assert_equal(t.rowLabels,['speed','acceleration','autonomy'])
         from pprint import pformat#otherwise it takes Goulib.tests.pprint...
         logging.debug(pformat(t.rows))
         assert_equal(t['speed']['bus'],V(100,'km/hour'))
@@ -53,11 +55,11 @@ class Tests:
         assert_equal(v('m/s'), 1)
         
     def test004_TableCell(self):
-        t = Table('test cell',[],[])
-        t.setCell(('speed','km/hour'),'car',V(100,'mph'))
-        t.setCell('speed','bus',V(100,'km/hour'))
+        t = Table(name='test cell')
+        t.set('speed [km/hour]','car',V(100,'mph'))
+        t.set('speed','bus',V(100,'km/hour'))
         assert_equal((t['speed']['car'])('km/hour'),160.93439999999998)
-        t.setCell('acceleration','car',V(1,'m/s^2'))
+        t.set('acceleration','car',V(1,'m/s^2'))
         logging.info(t._repr_html_())
         
 class TestMagnitudeIn:

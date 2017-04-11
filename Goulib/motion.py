@@ -8,12 +8,12 @@ import Goulib.table
 
 __author__ = "Philippe Guglielmetti"
 __copyright__ = "Copyright 2013, Philippe Guglielmetti"
-__credits__= ["http://osterone.bobstgroup.com/wiki/index.php?title=UtlCam"]
+__credits__= []
 __license__ = "LGPL"
 
 from math import sin
 from . import plot, polynomial, itertools2, math2
-from Goulib.units import V,Table, View
+from Goulib.units import V
 
 from numpy import allclose
 

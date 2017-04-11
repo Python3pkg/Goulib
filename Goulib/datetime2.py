@@ -182,7 +182,7 @@ def daysgen(start,length,step=oneday):
         yield start
         try:
             start=start+step
-        except:
+        except Exception:
             start=time_add(start,step)
         
 def days(start,length,step=oneday):
@@ -203,7 +203,7 @@ def timedelta_mul(t1,t2):
     '''multiplies a timedelta. should be a method of timedelta...'''
     try: #timedelta is t1
         return timedelta(seconds=t1.total_seconds() * t2)
-    except: #timedelta is t2
+    except Exception: #timedelta is t2
         return timedelta(seconds=t2.total_seconds() * t1)
     
 def time_sub(t1,t2):
@@ -237,7 +237,7 @@ def equal(a,b,epsilon=timedelta(seconds=0.5)):
     """
     try:
         d=abs(a-b)
-    except:
+    except Exception:
         d=abs(time_sub(a,b))
     return d<epsilon
 

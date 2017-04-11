@@ -23,14 +23,14 @@ __license__ = "LGPL"
 from math import  radians, degrees, tan, atan
 import logging, base64
 
-from .itertools2 import split, filter2, subdict
-from .geom import *
-from .plot import Plot
-from .colors import color_to_aci, aci_to_color
-from .interval import Box
-from .math2 import rint, isclose
+from Goulib.itertools2 import split, filter2, subdict, isiterable
+from Goulib.geom import *
+from Goulib.plot import Plot
+from Goulib.colors import color_to_aci, aci_to_color
+from Goulib.interval import Box
+from Goulib.math2 import rint, isclose
 
-from . import plot #set matplotlib backend
+from Goulib import plot #set matplotlib backend
 import matplotlib.pyplot as plt # after import .plot
 
 def Trans(scale=1, offset=None, rotation=None):
@@ -46,7 +46,7 @@ def Trans(scale=1, offset=None, rotation=None):
     if scale != 1:
         try:
             res = res.scale(scale[0],scale[1])
-        except:
+        except TypeError:
             res = res.scale(scale)
     if offset:
         res = res.translate(offset)
@@ -168,7 +168,7 @@ class Entity(plot.Plot):
     def end(self):
         try:
             return self.p2
-        except: #probably a Circle
+        except AttributeError: #probably a Circle
             return self.p
 
     def __repr__(self):
@@ -226,7 +226,7 @@ class Entity(plot.Plot):
         else:
             try:
                 res['layer']=self.layer
-            except:
+            except AttributeError:
                 pass
         return res
         
@@ -335,12 +335,12 @@ class Entity(plot.Plot):
         kwargs.setdefault('color',self.color)
         try:
             kwargs.setdefault('linewidth',self.width)
-        except:
+        except AttributeError:
             pass
         
         try:
             kwargs.setdefault('fill',self.fill)
-        except:
+        except AttributeError:
             pass
         
         if isinstance(self,Segment2):
@@ -368,7 +368,7 @@ class Entity(plot.Plot):
         if isinstance(self,Point2):
             try:
                 ms=self.width
-            except:
+            except AttributeError:
                 ms=0.01
             kwargs.setdefault('clip_on',False)
             return [patches.Circle(self.xy,ms,**kwargs)]
@@ -539,15 +539,13 @@ class _Group(Entity, Geometry):
         # recurse in structures by swapping Entities to intersect
         # in order to ensure we call geom intersect methods only with
         # "atomic" Entities
-        try:
-            iter(other)
-        except:
-            recurse=False
-        else:
-            recurse=True
+        swap = isiterable(other)
             
         for e in self:
-            inter=other.intersect(e) if recurse else e.intersect(other)
+            if swap:
+                inter=other.intersect(e)
+            else:
+                inter=e.intersect(other)
                 
             if inter is None: 
                 continue
@@ -556,7 +554,7 @@ class _Group(Entity, Geometry):
             elif isinstance(inter,Segment2) :
                 yield (inter.p,e)
                 yield (inter.p2,e)
-            elif isinstance(inter,list) : # list of multiple points
+            elif isiterable(inter) : # multiple points
                 for i in inter:
                     yield (i,e)
             else: #recursive call
@@ -565,19 +563,19 @@ class _Group(Entity, Geometry):
                     yield (i,e2)
 
     def connect(self, other):
+        #if we have an intersection, then it is a connection
         for (inter, _) in self.intersect(other):
             if isinstance(inter,Point2):
                 return Segment2(inter,inter) #segment of null length
             if isinstance(inter,Segment2):
                 return Segment2(inter.p,inter.p) #segment of null length
             raise
-        try:
-            iter(other)
-        except:
-            recurse=False
+        #else find the shortest Segment between both (Group) Entities
+        if isiterable(other):
+            conn=(other.connect(e).swap() for e in self)
         else:
-            recurse=True
-        return min((other.connect(e).swap() if recurse else e.connect(other) for e in self), key=lambda e:e.length)
+            conn=(e.connect(other) for e in self)
+        return min(conn, key=lambda e:e.length)
 
     def patches(self, **kwargs):
         """:return: list of :class:`~matplotlib.patches.Patch` corresponding to group"""
@@ -1121,11 +1119,15 @@ class Drawing(Group):
         class _Device(PDFDevice):
             def paint_path(self, graphicstate, stroke, fill, evenodd, path):
                 color=None
-                try: color=stroke.color
-                except: pass
+                try: 
+                    color=stroke.color
+                except AttributeError: 
+                    pass
                 if not color:
-                    try: color=fill.color
-                    except: pass
+                    try: 
+                        color=fill.color
+                    except AttributeError: 
+                        pass
                 t=Matrix3()
                 # geom.Matrix 3 has the following format:
                 # a b c
@@ -1175,7 +1177,7 @@ class Drawing(Group):
                     r,g,b=self.pop(self.ncs.ncomponents)
                     r,g,b=rint(r*255),rint(g*255),rint(b*255)
                     self.ncs.color='#%02x%02x%02x' % (r,g,b)
-                except:
+                except Exception:
                     pass
 
         #then all we have to do is to launch PDFMiner's parser on the file

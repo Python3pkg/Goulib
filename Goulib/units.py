@@ -16,6 +16,8 @@ def magnitudeIn(self,unit):
     return self.to(unit).magnitude
 V.__call__ = magnitudeIn
 
+'''
+
 class Row():
     """
     a Raw is internally a dict of {'colname1':value,'colname2',value...}
@@ -227,5 +229,5 @@ class View():
             html += '</tr>'
         html += '</table>'
         return html        
-        
+'''
     

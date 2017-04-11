@@ -23,27 +23,33 @@ from .markup import tag
 from .itertools2 import isiterable
 
 
-def html(obj, sep=None):
+def html(obj, **kwargs):
     try:
         return obj._repr_html_()
     except AttributeError:
         pass #skip logging.error
+    
+    pretty=kwargs.get('pretty',False) #pretty print mode
+    
+    sep=kwargs.get('sep','</br>' if pretty else None)
 
     if sep is None:
         sep=' '
         bra,ket='',''
     else:
         if isinstance(obj,dict):
-            res=',\n'.join("%s:%s"%(html(k),html(v)) 
-                for k,v in six.iteritems(obj))
-            return '{%s}'%res
+            bra,ket='{','}'
+            obj=["%s:%s"%(html(k),html(obj[k])) for k in obj]
         elif isinstance(obj,list):
             bra,ket='[',']'
         else:
             bra,ket='(',')'
+            
+    if pretty:
+        bra,ket='',''
 
     if isiterable(obj): #iterable, but not a string
-        return bra+sep.join(html(a,sep=',') for a in obj)+ket
+        return bra+sep.join(html(a,**kwargs) for a in obj)+ket
 
     try:
         return unicode(obj,'utf-8') #to render accented chars correctly
@@ -64,8 +70,8 @@ def h3(*args):
 def h4(*args):
     display(HTML(tag('h4',html(args))))
 
-def h(*args):
-    display(HTML(html(args)))
+def h(*args,**kwargs):
+    display(HTML(html(args,**kwargs)))
 
 #redefine "print" for notebooks ...
 try: #http://stackoverflow.com/questions/15411967/how-can-i-check-if-code-is-executed-in-the-ipython-notebook

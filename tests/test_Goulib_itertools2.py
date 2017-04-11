@@ -421,5 +421,10 @@ class TestIntersect:
         
         assert_equal(intersect(*postings),[100, 322])
 
+class TestChunks:
+    def test_chunks(self):
+        # assert_equal(expected, chunks(l, n))
+        raise SkipTest # TODO: implement your test here
+
 if __name__ == "__main__":
     runmodule()
