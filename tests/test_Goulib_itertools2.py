@@ -41,10 +41,13 @@ class TestDrop:
 
 class TestIlen:
     def test_ilen(self):
-        assert_equal(ilen(gen10()),10)
-        assert_equal(ilen(gen10()),10)
         assert_equal(ilen(irange(10,0)),0)
         assert_equal(ilen(irange(11,20)),10)
+        
+        #TODO: make it work with generator cloning or tee
+        assert_equal(ilen(gen10()),10)
+        assert_equal(ilen(gen10()),10)
+        
 
 class TestIrange:
     def test_irange(self):

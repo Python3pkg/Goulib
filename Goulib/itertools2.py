@@ -31,7 +31,8 @@ def index(n, iterable):
         return iterable[n]
     except TypeError:
         pass
-    for i,x in enumerate(tee(iterable)[1]):
+    iterable,it=tee(iterable) # make a copy
+    for i,x in enumerate(it):
         if i==n:
             return x
     raise IndexError
@@ -64,14 +65,15 @@ def drop(n, iterable):
     """Drop n elements from iterable and return the rest"""
     return itertools.islice(iterable, n, None)
 
-def ilen(it):
+def ilen(iterable):
     """
     :result: int length exhausting an iterator
     """
     try:
-        return len(it) #much faster if defined...
-    except:
-        return sum(1 for _ in tee(it)[1])
+        return len(iterable) #much faster if defined...
+    except TypeError:
+        # iterable,it=tee(iterable) #make a copy #TODO: make it work
+        return sum(1 for _ in iterable)
 
 def irange(start_or_end, optional_end=None):
     """
@@ -170,6 +172,7 @@ def flatten(l, donotrecursein=six.string_types):
         else:
             for sub in flatten(el,donotrecursein):
                 yield sub
+    pass
 
 def itemgetter(iterable,i):
     for item in iterable:
@@ -204,7 +207,7 @@ def tee(iterable,n=2):
     :result: independent tee of iterable
     """
     if isinstance(iterable,(list,tuple,set,dict)):
-        iterable=itertools.chain(iterable) #transform in iterator
+        iterable=itertools.chain(iterable) #wrap into iterator
     return itertools.tee(iterable,n)
 
 def groups(iterable, n, step=None):
@@ -244,12 +247,12 @@ def shape(iterable):
     :see: http://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.ndarray.shape.html
     """
     res=[]
-    try:
-        while True:
-            res.append(ilen(iterable))
-            iterable=first(iterable)
-    except (IndexError, TypeError):
-        pass
+    while isiterable(iterable):
+        l=list(iterable)
+        n=len(l)
+        res.append(n)
+        if n==0: break
+        iterable=l[0]
     return res
 
 def ndim(iterable):
