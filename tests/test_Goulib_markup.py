@@ -1,23 +1,4 @@
 #!/usr/bin/env python
-<<<<<<< HEAD
-# coding: utf8
-
-from nose.tools import assert_equal
-from nose import SkipTest
-#lines above are inserted automatically by pythoscope. Line below overrides them
-from Goulib.tests import *
-
-from Goulib.markup import *
-
-class TestCgiprint:
-    def test_cgiprint(self):
-        # assert_equal(expected, cgiprint(inline, unbuff, line_end))
-        raise SkipTest 
-
-class TestTag:
-    def test_tag(self):
-        t=tag('tag', u'bétweêñ', class_='class')
-=======
 # -*- coding: utf-8 -*-
 
 from nose.tools import assert_equal
@@ -35,7 +16,6 @@ class TestCgiprint:
 class TestTag:
     def test_tag(self):
         t=tag('tag', u'bÃ©tweÃªÃ±', class_='class')
->>>>>>> branch 'master' of https://github.com/goulu/Goulib.git
         assert_true(t in (
             '<tag class="class">b&#233;twe&#234;&#241;</tag>', #Py 3
             '<tag class="class">b\xc3\xa9twe\xc3\xaa\xc3\xb1</tag>', #Py 2.7
