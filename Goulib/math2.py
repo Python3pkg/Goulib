@@ -19,6 +19,14 @@ from six.moves import map, reduce, filter, zip_longest
 
 from Goulib import itertools2
 
+integer_types=six.integer_types
+
+try:
+    import numpy as np
+    integer_types=tuple(list(six.integer_types)+[np.integer])
+    NUMPY=True
+except ImportError:
+    NUMPY=False
 
 inf=float('Inf') #infinity
 
@@ -137,9 +145,12 @@ def is_integer(x, epsilon=1e-6):
     """
     :return: True if  float x is almost an integer
     """
-    if type(x) is int:
+    if isinstance(x,integer_types):
         return True
-    return isclose(x,round(x),0,epsilon)
+    try:
+        return isclose(x,round(x),0,epsilon)
+    except TypeError: #not a number
+        return False
 
 def rint(v):
     """:return: int value nearest to float v"""

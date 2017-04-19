@@ -264,16 +264,25 @@ def ndim(iterable):
     return len(shape(iterable))
 
 
-def reshape(data,dims):
+def reshape(data,dims,fill=None):
     """
-    :result: data as a n-dim matrix
+    :param data: any structure (will be flattened)
+    :param dims: tuple of integer dimensions
+    :param fill: value to fill data to desired dims
+    :result: data as a n-dim matrix (list of list of ...)
     """
     data=list(flatten(data))
     for d in dims[::-1]: #reversed
         if d:
-            data=[data[i:i+d] for i in range(0,len(data),d)]
+            res=[]
+            for i in range(0,len(data),d):
+                row=data[i:i+d]
+                if len(row)<d:
+                    row=row+[fill]*(d-len(row))
+                res.append(row)
         else:
-            data=[data]
+            res=[data]
+        data=res
     return data[0]
 
 

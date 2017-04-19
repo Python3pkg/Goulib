@@ -29,7 +29,7 @@ class TestTable:
         ref='<tr><td style="text-align:right;">2012-01-09</td><td>Central</td><td>Smith</td><td>Desk</td><td style="text-align:right;">2</td><td style="text-align:right;">125.00</td><td style="text-align:right;">250.00</td></tr>'
         t=Row(self.t[14])
         t=t.html()
-        #assert_equal(t,ref) #SkipTest for now
+        assert_equal(t,ref)
 
         #add a column to test timedeltas
         d=self.t.col('OrderDate')
@@ -43,10 +43,22 @@ class TestTable:
         t2=Table([(1,2),[3,4]])
         assert_equal(t1,t2)
         #check Table is mutable even if instantiated with tuples
-        t2[0,0]=2 #chained indexing does't work
+        t2[0,0]=2 
         assert_not_equal(t1,t2)
+        
+        t2[0][0]=1 
+        assert_equal(t1,t2)
+        
+        def gen10():
+            for i in range(10):
+                yield i
+            pass
+        
         #and also generators, even for a single column
-        assert_equal(Table((i for i in range(10))),Table((range(10))))
+        assert_equal(Table(gen10()),Table((range(10))))
+        
+        t3=Table([[1,2,3],(4,5)])
+        assert_equal(t3[1,2],None)
 
     def test___repr__(self):
         pass #tested in setup
@@ -109,9 +121,9 @@ class TestTable:
     def test_append(self):
         ta = Table()
         ta.append({'col1':1,'col2':2})
-        assert_true(len(ta)==1 and ta.ncols()==2)
+        assert_true(len(ta)==1 and ta.ncols==2)
         ta.append([3,4])
-        assert_true(len(ta)==2 and ta.ncols()==2)
+        assert_true(len(ta)==2 and ta.ncols==2)
 
     def test_col(self):
         assert_equal(self.t.col('Cost'),self.t[:,'Cost'])
@@ -123,7 +135,7 @@ class TestTable:
         assert_equal(col[-1],275)
 
     def test_ncols(self):
-        assert_equal(self.t.ncols(),8)
+        assert_equal(self.t.ncols,8)
 
     def test_setcol(self):
         pass #tested by test_addcol
@@ -133,14 +145,11 @@ class TestTable:
         n=len(t)
         t.addcol('Discount', 0.15, 4)
         assert_equal(len(t),n)  #check we don't change the lines
-        assert_equal(t.ncols(),9)
-
-    def test_find_col(self):
-        assert_equal(self.t.find_col('Date'),self.t._i('OrderDate'))
+        assert_equal(t.ncols,9)
 
     def test_get(self):
-        assert_equal(self.t.get(3,'Cost'),self.t[3,5])
-        assert_equal(self.t.get(-1,'Total'),139.72)
+        assert_equal(self.t.get((3,'Cost')),self.t[3,5])
+        assert_equal(self.t.get((-1,'Total')),139.72)
 
     def test_groupby(self):
         d=self.t.groupby(u'Région')

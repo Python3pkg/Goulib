@@ -78,8 +78,8 @@ class TestCase(unittest.TestCase):
         
         #tee or copy sequences in order to exhaust generators in pprint
         #TODO: find a way (if any...) to move this in pprint
-        seq1,p1=itertools2.tee(seq1,copy=None)
-        seq2,p2=itertools2.tee(seq2,copy=None)
+        seq1,p1=itertools2.tee(seq1)
+        seq2,p2=itertools2.tee(seq2)
         seq1_repr = pprint(p1)
         seq2_repr = pprint(p2)
 

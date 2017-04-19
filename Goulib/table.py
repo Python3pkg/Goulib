@@ -31,10 +31,8 @@ Element=ElementTree._Element
 
 import datetime as std_datetime
 from datetime import datetime, date, time, timedelta
-from .datetime2 import datef, datetimef, timef, timedeltaf, strftimedelta
 
-from .markup import tag, style_str2dict
-from .itertools2 import isiterable
+from Goulib import datetime2, markup, itertools2, math2
 
 def attr(args):
     res=''
@@ -46,7 +44,7 @@ def attr(args):
 class Table(pandas.DataFrame):
     """Table class with CSV I/O, easy access to columns, HTML output"""
 
-    def __init__(self,data=None, index=None, columns=None, copy=False, **kwargs):
+    def __init__(self,data=[], index=None, columns=None, copy=False, **kwargs):
         """inits a table, optionally by reading a Excel, csv or html file
         :param data: list of list of cells, or string as filename
         :param titles: optional list of strings used as column id
@@ -56,21 +54,26 @@ class Table(pandas.DataFrame):
         filename=None
         if isinstance(data,six.string_types):
             filename=data
-            data=[]
+            super().__init__(None,index=index,columns=columns,copy=copy)
+            self.load(filename,**kwargs)
         elif isinstance(data,pandas.DataFrame):
             columns=columns or data.columns
-            index=index or data.index
-
-        try:
+            index=index or data.index 
             super().__init__(data,index=index,columns=columns,copy=copy)
-        except PandasError:
-            data = np.array(data)
+        else:
+            data=list(data)
+            dims=itertools2.shape(data)
+            if len(dims)==1:
+                dims=[1,dims[0]] #make a single row
+            data=itertools2.reshape(data,dims)
+            data=np.array(data)
             if columns is None:
-                columns=range(data.shape[1])
+                try:
+                    columns=range(data.shape[1])
+                except IndexError:
+                    columns=[]
             super().__init__(data,index=index,columns=columns,copy=copy)
-
-        if filename:
-            self.load(filename,**kwargs)
+                
 
     def _init_from(self,dataframe):
         self._data=dataframe._data
@@ -81,10 +84,6 @@ class Table(pandas.DataFrame):
     # while Table had a row based one, which seems more logical for many applications
     # so here we define both:
     
-    def __iter__(self):
-        logging.warning('ambiguous. Please prefer Table.rows or Table.cols iterators')
-        return super().__iter__()
-    
     @property
     def cols(self):
         """Iterate over infor axis"""
@@ -93,31 +92,35 @@ class Table(pandas.DataFrame):
     @property
     def rows(self):
         """Iterate over rows"""
-        for k,row in self.iterrows():
+        for _,row in self.iterrows():
             yield row.values
 
     @property
     def titles(self):
         res=self.axes[-1]
         return res.values
+    
+    @property
+    def ncols(self):
+        return self.shape[-1]
+    
+    @property
+    def nrows(self):
+        return self.shape[0]
 
     def row(self,key):
-        return Row(self.loc[[key]],copy=False)
+        return Row(self.loc[[key]],columns=self.columns,copy=False)
 
     def row_as_list(self,key):
         return self.row(key).values.tolist()[0]
 
     def __getitem__(self, key):
         """Table uses [row] or [row,col] indexing"""
-        if isinstance(key,tuple):
-            col=key[1]
-            if isinstance(col,int):
-                return self.iat[col,key[0]]
-            key=tuple((col,key[0]))
-        elif isinstance(key,int):
+        if isinstance(key,int):
             return self.row(key)
-        res=super().__getitem__(key)
-        return res
+        elif isinstance(key,tuple):
+            return self.ix[key]
+        return super().__getitem__(key)
 
     def __setitem__(self, key,value):
         """Table allows [row] or [row,col] indexing"""
@@ -129,14 +132,30 @@ class Table(pandas.DataFrame):
 
 
     def col(self,key):
+        """
+        :return: list of columns values
+        """
         return self[key].values.tolist()
 
     def addcol(self,title,val=None,i=0):
         """add column to the right"""
-        if not isiterable(val):
+        if not itertools2.isiterable(val):
             val=[val]*(len(self)-i)
-        self[title] = pandas.Series(val, index=self.index)
+        self[title] = pandas.Series(val) #, index=self.index)
         return self
+    
+    def append(self,line):
+        """appends a line to table
+        :param line: can be either:
+        * a list
+        * a dict or column names:values
+        """
+        if isinstance(line,dict):
+            r=len(self) #row number
+            for k,v in line.items():
+                self[r,k]=v
+            return self
+        return super().append(line)
 
     def __eq__(self,other):
         return self.equals(other)
@@ -201,22 +220,22 @@ class Table(pandas.DataFrame):
     def to_datetime(self,by,fmt='%Y-%m-%d %H:%M:%S',skiperrors=False):
         """convert a column to datetime
         """
-        return self._datetimeformat(by, fmt, datetimef, skiperrors)
+        return self._datetimeformat(by, fmt, datetime2.datetimef, skiperrors)
 
     def to_date(self,by,fmt='%Y-%m-%d',skiperrors=False):
         """convert a column to date
         """
-        return self._datetimeformat(by, fmt, datef, skiperrors)
+        return self._datetimeformat(by, fmt, datetime2.datef, skiperrors)
 
     def to_time(self,by,fmt='%H:%M:%S',skiperrors=False):
         """convert a column to time
         """
-        return self._datetimeformat(by, fmt, timef, skiperrors)
+        return self._datetimeformat(by, fmt, datetime2.timef, skiperrors)
 
     def to_timedelta(self,by,fmt=None,skiperrors=False):
         """convert a column to time
         """
-        return self._datetimeformat(by, fmt, timedeltaf, skiperrors)
+        return self._datetimeformat(by, fmt, datetime2.timedeltaf, skiperrors)
 
     def _repr_html_(self):
         return self.style._repr_html_()
@@ -475,11 +494,7 @@ class Table(pandas.DataFrame):
                 return False
         return True
 
-    def ncols(self):
-        """
-        :return: number of columns, ignoring title
-        """
-        return reduce(max,list(map(len,self)))
+
 
     def find_col(self,title):
         """finds a column from a part of the title"""
@@ -568,23 +583,7 @@ class Table(pandas.DataFrame):
             for i in range(i,len(self)):
                 self.set(i,j,value)
 
-    def append(self,line):
-        """appends a line to table
-        :param line: can be either:
-        * a list
-        * a dict or column names:values
-        """
-        if isinstance(line,dict):
-            r=len(self) #row number
-            for k,v in line.items():
-                i=self._i(k)
-                if i is None: #column doesn't exist:
-                    i=len(self.titles)
-                    self.titles.append(k)
-                self.set(r,i,v)
-        else:
-            list.append(self,list(line))
-        return self
+    
 
 
     def sort(self,by,reverse=False):
@@ -673,21 +672,9 @@ class Table(pandas.DataFrame):
 '''
 
 class Row(pandas.DataFrame):
-    """ a DataFrame of a single Table row"""
-    def __getitem__(self, key):
-        if isinstance(key,int):
-            key=self.titles[key]
-        res=super().__getitem__(key)
-        return res.values[0] if res.size==1 else res
-    def __setitem__(self, key,value):
-        if isinstance(key,int):
-            key=self.titles[key]
-        return super().__setitem__(key,value)
-
-'''
-class Row(object):
     """Table row with HTML attributes"""
-    def __init__(self,data,align=None,fmt=None,tag=None,style={}):
+    
+    def __init__(self,data,**kwargs):
         """
         :param data: (list of) cell value(s) of any type
         :param align: (list of) string for HTML align attribute
@@ -695,54 +682,29 @@ class Row(object):
         :param tag: (list of) tags called to build each cell. defaults to 'td'
         :param style: (list of) dict or string for HTML style attribute
         """
-
-        if not isiterable(data) :
-            data=[data]
-        data=list(data) #to make it mutable
-
-        #ensure params have the same length as data
-
-        if not isinstance(style,list): style=[style]
-        style=style+[None]*(len(data)-len(style))
-
-        if not isinstance(align,list): align=[align]
-        align=align+[None]*(len(data)-len(align))
-
-        if not isinstance(fmt,list)  : fmt=[fmt]
-        fmt=fmt+[None]*(len(data)-len(fmt))
-
-        if not tag:tag='td'
-        if not isinstance(tag,list)  :
-            tag=[tag]*(len(data)) #make a full row, in case it's a 'th'
-        tag=tag+[None]*(len(data)-len(fmt)) #fill the row with None, which will be 'td's
-
-        for i,cell in enumerate(data):
-            if not isinstance(cell,Cell):
-                cell=Cell(cell,align[i],fmt[i],tag[i],style[i])
-            else:
-                pass #ignore attribs for now
-            data[i]=cell
-
-
-
-        self.data=data
+        super().__init__(data,**kwargs)
+        
+    def __getitem__(self, key):
+        if isinstance(key,int):
+            return self.iloc[0,key]
+        return self.loc[0,key]
+    
+    def __setitem__(self, key,value):
+        return super().__setitem__(key,value)
 
     def __repr__(self):
         return str(self.data)
 
-            def _repr_html_(self):
+    def _repr_html_(self):
         return self.html()
 
     def html(self,cell_args={},**kwargs):
         """return in HTML format"""
         res=''
         for k,v in self.iteritems():
-            cell=Cell(v)
+            cell=Cell(v.iloc[0])
             res+=cell.html(**cell_args)
-        return tag('tr',res,**kwargs)
-
-
-'''
+        return markup.tag('tr',res,**kwargs)
 
 class Cell(object):
     """Table cell with HTML attributes"""
@@ -780,7 +742,7 @@ class Cell(object):
         self.fmt=fmt
         self.tag=tag if tag else 'td'
         if not isinstance(style,dict):
-            style=style_str2dict(style)
+            style=markup.style_str2dict(style)
         self.style=style
 
     def __repr__(self):
@@ -819,17 +781,17 @@ class Cell(object):
                 s=v._repr_html_()
             except Exception as e:
                 s='ERROR : %s _repr_html_ failed : %s'%(v,e)
-            return tag(self.tag,s,**args)
+            return markup.tag(self.tag,s,**args)
 
         style=args.get('style',{})
         if not isinstance(style,dict):
-            style=style_str2dict(style)
+            style=markup.style_str2dict(style)
 
         if not 'text-align' in style: #HTML 4 and before
             a=args.pop('align',self.align)
-            if isinstance(v,int):
+            if isinstance(v,math2.integer_types):
                 if not a: a="right"
-            elif isinstance(v,float):
+            elif math2.is_number(v):
                 if not a: a="right"
                 if not f: f='%0.2f'
                 v=f%v
@@ -842,7 +804,7 @@ class Cell(object):
             elif isinstance(v,timedelta):
                 if not a: a="right"
                 if not f: f='%H:%M:%S'
-                v=strftimedelta(v,f)
+                v=datetime2.strftimedelta(v,f)
                 f=None #don't reformat below
 
             if a:
@@ -857,6 +819,6 @@ class Cell(object):
             v="&nbsp;" #for IE8
         else:
             v=f%v if f else six.text_type(v)
-        return tag(self.tag,v,**args)
+        return markup.tag(self.tag,v,**args)
 
 

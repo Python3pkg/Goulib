@@ -153,8 +153,19 @@ class TestFibonacci:
         #http://controlfd.com/2016/07/05/using-floats-in-python.html
         assert_equal(fibonacci(78),8944394323791464)
         
+        assert_equal(number_of_digits(fibonacci(1000000)),208988)
+        
         #mod 1000000007 has the effect of using int32 only
         assert_equal(fibonacci(int(1E19),1000000007),647754067)
+        
+        """
+        phi=(1+sqrt(5))/2
+        for n in range(100):
+            f1=fibonacci(n)
+            f2=round(phi**n/sqrt(5))
+            if f1!=f2:
+                print(n,f1,f2)
+        """
 
 class TestIsInteger:
     def test_is_integer(self):
