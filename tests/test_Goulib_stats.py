@@ -59,6 +59,7 @@ class TestStats:
         assert_equal(self.h.avg,hmean)
         
     def test_variance(self):
+<<<<<<< HEAD
         assert_equal(self.f.variance,fvar)
         assert_equal(self.h.var,hvar)
 
@@ -281,6 +282,48 @@ class TestStats:
         # stats = Stats(data, mean, var)
         # assert_equal(expected, stats.sum2())
         raise SkipTest # TODO: implement your test here
+=======
+        assert_equal(self.f.variance,fvar,places=3)
+        assert_equal(math2.rint(self.h.var),hvar)
+
+
+    def test_stddev(self):
+        # Stats = Stats(data, mean, var)
+        # assert_equal(expected, Stats.stddev())
+        raise SkipTest 
+
+class TestStddev:
+    def test_stddev(self):
+        assert_equal(stddev(h),math.sqrt(hvar),1)
+
+class TestConfidenceInterval:
+    def test_confidence_interval(self):
+        assert_equal(confidence_interval(h),(23996,63806),0)
+
+class TestMedian:
+    def test_median(self):
+        assert_equal(median(h),44627.5)
+        assert_equal(median(r),0.5,places=1)
+
+class TestMode:
+    def test_mode(self):
+        assert_equal(mode(h),4978)
+        assert_equal(mode([1,1,1,2,2,3]),1) #test when mode is first
+        assert_equal(mode([1,2,2,3,3,3]),3) #test when mode is last
+        assert_equal(mode([1,2,2,3,3,4]),2) #test equality
+
+    def test___init__(self):
+        # mode = Mode(name, nchannels, type, min, max)
+        raise SkipTest # TODO: implement your test here
+
+    def test___repr__(self):
+        # mode = Mode(name, nchannels, type, min, max)
+        # assert_equal(expected, mode.__repr__())
+        raise SkipTest # TODO: implement your test here
+
+
+
+>>>>>>> branch 'master' of https://github.com/goulu/Goulib.git
 
 class TestLinearRegression:
     def test_linear_regression(self):
