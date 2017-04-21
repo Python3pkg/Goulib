@@ -32,12 +32,12 @@ def debug(func):
     @functools.wraps(func)
     def wrapper(*args, **kwds):
         logger=logging.getLogger()
-        logger.info(ENTRY_MESSAGE.format(func.__name__)) 
+        logger.info(ENTRY_MESSAGE.format(func.__name__))
         level=logger.getEffectiveLevel()
         logger.setLevel(logging.DEBUG)
         f_result = func(*args, **kwds)
         logger.setLevel(level)
-        logger.info(EXIT_MESSAGE.format(func.__name__)) 
+        logger.info(EXIT_MESSAGE.format(func.__name__))
         return f_result
     return wrapper
 
@@ -60,9 +60,9 @@ from multiprocessing.pool import ThreadPool
 import six.moves._thread as thread
 import threading
 import weakref
- 
+
 thread_pool = None
- 
+
 def get_thread_pool():
     global thread_pool
     if thread_pool is None:
@@ -71,7 +71,7 @@ def get_thread_pool():
             threading.current_thread()._children = weakref.WeakKeyDictionary()
         thread_pool = ThreadPool(processes=1)
     return thread_pool
- 
+
 def timeout(timeout):
     def wrap_function(func):
         @functools.wraps(func)
@@ -87,11 +87,11 @@ def timeout(timeout):
 #https://gist.github.com/goulu/45329ef041a368a663e5
 from threading import Timer
 from multiprocessing import TimeoutError
-    
+
 def itimeout(iterable,timeout):
     """timeout for loops
     :param iterable: any iterable
-    :param timeout: float max running time in seconds 
+    :param timeout: float max running time in seconds
     :yield: items in iterator until timeout occurs
     :raise: multiprocessing.TimeoutError if timeout occured
     """
@@ -99,6 +99,47 @@ def itimeout(iterable,timeout):
     timer.start()
     for i in iterable:
         yield i
-        if timer.finished.is_set(): 
+        if timer.finished.is_set():
             raise TimeoutError
     timer.cancel() #don't forget it, otherwise it threads never finish...
+
+import inspect
+import warnings
+
+# http://stackoverflow.com/a/40301488/1395973
+
+class deprecated(object):
+    def __init__(self, reason):
+        if inspect.isclass(reason) or inspect.isfunction(reason):
+            raise TypeError("Reason for deprecation must be supplied")
+        self.reason = reason
+
+    def __call__(self, cls_or_func):
+        if inspect.isfunction(cls_or_func):
+            if hasattr(cls_or_func, 'func_code'):
+                _code = cls_or_func.func_code
+            else:
+                _code = cls_or_func.__code__
+            fmt = "Call to deprecated function or method {name} ({reason})."
+            filename = _code.co_filename
+            lineno = _code.co_firstlineno + 1
+
+        elif inspect.isclass(cls_or_func):
+            fmt = "Call to deprecated class {name} ({reason})."
+            filename = cls_or_func.__module__
+            lineno = 1
+
+        else:
+            raise TypeError(type(cls_or_func))
+
+        msg = fmt.format(name=cls_or_func.__name__, reason=self.reason)
+
+        @functools.wraps(cls_or_func)
+        def new_func(*args, **kwargs):
+            warnings.simplefilter('always', DeprecationWarning)  # turn off filter
+            warnings.warn(msg, category=DeprecationWarning, stacklevel=2)
+            #warnings.warn_explicit(msg, category=DeprecationWarning, filename=filename, lineno=lineno)
+            warnings.simplefilter('default', DeprecationWarning)  # reset filter
+            return cls_or_func(*args, **kwargs)
+
+        return new_func
