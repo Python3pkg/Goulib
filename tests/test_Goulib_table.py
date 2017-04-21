@@ -103,10 +103,9 @@ class TestTable:
         pass #tested in setup
 
     def test_html(self):
-        t=self.t.save(self.path+'/results/table/test.htm')
+        self.t.save(self.path+'/results/table/test.htm')
 
         t=Table(self.path+'/results/table/test.htm')
-        assert_equal(t._i('OrderDate'),0) #check the column exists
 
         t.to_date('OrderDate')
         t.to_timedelta('timedelta')
@@ -184,9 +183,8 @@ class TestTable:
     def test_remove_lines_where(self):
         import copy
         t=copy.deepcopy(self.t) #so we can play with it
-        i=t._i('Rep')
         l=len(t)
-        r=t.remove_lines_where(lambda line:line[i]=='Jones')
+        r=t.remove_lines_where(lambda line:line['Rep']=='Jones')
         assert_equal(r,8)
         assert_equal(len(t),l-r)
 

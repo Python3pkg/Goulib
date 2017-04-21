@@ -32,7 +32,7 @@ Element=ElementTree._Element
 import datetime as std_datetime
 from datetime import datetime, date, time, timedelta
 
-from Goulib import datetime2, markup, itertools2, math2
+from Goulib import datetime2, markup, itertools2, math2, decorators
 
 def attr(args):
     res=''
@@ -170,27 +170,42 @@ class Table(pandas.DataFrame):
         else: #read titles from the file
             l=kwargs.setdefault('titles_line',1)
             kwargs.setdefault('data_line',l+1)
-        ext=filename.split('.')[-1].lower()
-        if ext in ('xls','xlsx'):
-            self.read_xls(filename,**kwargs)
-        elif ext in ('htm','html'):
-            self.read_html(filename,**kwargs)
-        elif ext in ('json'):
-            self.read_json(filename,**kwargs)
-        else: #try ...
-            self.read_csv(filename,**kwargs)
-        return self #to allow chaining
-
-    def read_xls(self, filename, **kwargs):
-        """appends an Excel table"""
+            
         titles_line=kwargs.pop('titles_line',1)-1
         data_line=kwargs.pop('data_line',2)-1
-        sheetname=kwargs.pop('sheet',0)
         kwargs.setdefault('skiprows',list(range(0,titles_line)))
-        kwargs.setdefault('index',titles_line)
-
-        res=pandas.read_excel(filename,sheetname,**kwargs)
-        return self._init_from(res)
+        kwargs.setdefault('encoding','utf-8') #sometimes iso-8859-1
+        
+        ext=filename.split('.')[-1].lower()
+        if ext in ('xls','xlsx'):
+            kwargs.setdefault('index',titles_line)
+            sheetname=kwargs.pop('sheet',0)
+            kwargs.setdefault('sheetname',sheetname)
+            res=pandas.read_excel(filename,**kwargs)
+        elif ext in ('htm','html'):
+            res=pandas.read_html(filename,**kwargs)[0]
+        elif ext in ('json'):
+            res=pandas.read_json(filename,**kwargs)
+        else:
+            res=pandas.read_csv(filename,**kwargs)
+        self._init_from(res)
+        return self #to allow chaining
+    
+    def save(self,filename,**kwargs):
+        kwargs.setdefault('encoding','utf-8') #sometimes iso-8859-1
+        ext=filename.split('.')[-1].lower()
+        if ext in ('xls','xlsx'):
+            self.to_excel(filename,**kwargs)
+        elif ext in ('htm','html'):
+            kwargs.pop('encoding')
+            with open(filename, 'w') as file:
+                self.to_html(file,**kwargs)
+        elif ext in ('json'):
+            with open(filename, 'w') as file:
+                self.to_json(file,**kwargs)
+        else: #try ...
+            self.to_csv(filename,**kwargs)
+        return self #to allow chaining
 
     def applyf(self,col,f,skiperrors=False):
         """ apply a function to a column
@@ -242,7 +257,46 @@ class Table(pandas.DataFrame):
 
     def html(self):
         return self.style.render()
-
+    
+    def unique_gen(self,by,sort=True,removecol=True):
+        """generates subtables
+        """
+        values=self[by].unique()
+        if sorted:
+            values.sort()
+        for k in values:
+            t=self.loc[self[by] == k]
+            t=Table(t)
+            if removecol:
+                del t[by]
+            yield k,t
+            
+    def unique(self,by,sort=True,removecol=True):
+        """ ordered dictionary of subtables
+        """
+        return collections.OrderedDict(
+            (k,t) for (k,t) in self.unique_gen(by,sort,removecol)
+        )
+            
+    @decorators.deprecated('use Table.unique_gen')
+    def groupby_gen(self,by,sort=True,removecol=True):
+        return self.unique_gen(by,sort,removecol)
+            
+    @decorators.deprecated('use Table.unique')
+    def groupby(self,by,sort=True,removecol=True):
+        """ ordered dictionary of subtables
+        """
+        return self.unique(by,sort,removecol)
+    
+    def remove_lines_where(self,f,value=(None,0,'')):
+        """
+        :param f: function of the form lambda line:bool returning True if line should be removed
+        :return: int number of lines removed
+        """
+        lines=self[f].index
+        self.drop(lines, inplace=True)
+        return len(lines)
+    
     '''
 
     def __repr__(self):
@@ -398,19 +452,7 @@ class Table(pandas.DataFrame):
                     self.append(line)
         return self
 
-    def save(self,filename,**kwargs):
-        ext=filename.split('.')[-1].lower()
-        if ext in ('xls','xlsx'):
-            self.write_xlsx(filename,**kwargs)
-        elif ext in ('htm','html'):
-            with open(filename, 'w') as file:
-                file.write(self.html(**kwargs))
-        elif ext in ('json'):
-            with open(filename, 'w') as file:
-                file.write(self.json(**kwargs))
-        else: #try ...
-            self.write_csv(filename,**kwargs)
-        return self #to allow chaining
+
 
     def write_xlsx(self,filename, **kwargs):
         import xlsxwriter
@@ -602,30 +644,6 @@ class Table(pandas.DataFrame):
         for i in range(len(self)):
             yield self.rowasdict(i)
 
-    def groupby_gen(self,by,sort=True,removecol=True):
-        """generates subtables
-        """
-        i=self._i(by)
-        t=self.titles
-        if removecol: t=t[:i]+t[i+1:]
-        if sort:
-            self.sort(i)
-        else:
-            pass #groupby will group CONSECUTIVE lines with same i, so entries at bottom of table will replace the earlier entries in dict
-        for k, g in itertools.groupby(self, key=lambda x:x[i]):
-            if removecol:
-                r=Table(titles=t,data=[a[:i]+a[i+1:] for a in g])
-            else:
-                r=Table(titles=t,data=list(g))
-            yield k,r
-
-    def groupby(self,by,sort=True,removecol=True):
-        """ ordered dictionary of subtables
-        """
-        return collections.OrderedDict(
-            (k,t) for (k,t) in self.groupby_gen(by,sort,removecol)
-        )
-
 
     def hierarchy(self,by='Level',
                   factory=lambda row:(row,[]),          #creates an object from a line
@@ -659,16 +677,6 @@ class Table(pandas.DataFrame):
                 self.footer.append(f)
         return self.footer
 
-    def remove_lines_where(self,f,value=(None,0,'')):
-        """
-        :param f: function of the form lambda line:bool returning True if line should be removed
-        :return: int number of lines removed
-        """
-        i=self._i(f)
-        if i is not None:
-            f=lambda x:x[i] in value
-        from .itertools2 import removef
-        return len(removef(self,f))
 '''
 
 class Row(pandas.DataFrame):
@@ -707,7 +715,9 @@ class Row(pandas.DataFrame):
         return markup.tag('tr',res,**kwargs)
 
 class Cell(object):
-    """Table cell with HTML attributes"""
+    """Table cell with HTML attributes
+    Cell objects are created only when calling Table.to_html
+    """
     def __init__(self,data=None,align=None,fmt=None,tag=None,style={}):
         """
         :param data: cell value(s) of any type
